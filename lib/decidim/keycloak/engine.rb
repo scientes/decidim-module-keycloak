@@ -11,7 +11,11 @@ module Decidim
       initializer "decidim.keycloak.middleware" do |app|
         # Check for environment variables (new method) or secrets.yml (backwards compatibility)
         has_env_config = ENV["DECIDIM_KEYCLOAK_CLIENT_ID"].present?
-        has_secrets_config = Rails.application.secrets.dig(:omniauth, :keycloakopenid).present?
+        has_secrets_config = begin
+          Rails.application.secrets.dig(:omniauth, :keycloakopenid).present?
+        rescue NoMethodError
+          false
+        end
         
         next unless has_env_config || has_secrets_config
 
