@@ -20,7 +20,21 @@ bundle
 
 ## Configuration
 
-Add to your `config/secrets.yml` the OAuth keys:
+### Recommended: Using Environment Variables (Decidim 31+)
+
+Set the following environment variables directly:
+
+```bash
+DECIDIM_KEYCLOAK_CLIENT_ID=your_client_id
+DECIDIM_KEYCLOAK_CLIENT_SECRET=your_client_secret
+DECIDIM_KEYCLOAK_SITE=https://your-keycloak-server/realms/your-realm
+DECIDIM_KEYCLOAK_REALM=your_realm
+DECIDIM_KEYCLOAK_BASE_URL=https://your-keycloak-server  # Optional
+```
+
+### Legacy: Using secrets.yml (Decidim 30 and below)
+
+If you're using Decidim 30 or earlier, add to your `config/secrets.yml`:
 
 ```yaml
   omniauth:
@@ -31,19 +45,14 @@ Add to your `config/secrets.yml` the OAuth keys:
       client_secret: <%= ENV["OMNIAUTH_KEYCLOAK_CLIENT_SECRET"] %>
       site: <%= ENV["OMNIAUTH_KEYCLOAK_SITE"] %>
       realm: <%= ENV["OMNIAUTH_KEYCLOAK_REALM"] %>
-      base_url: <%= ENV["OMNIAUTH_KEYCLOAK_BASE_URL"] %>" 
+      base_url: <%= ENV["OMNIAUTH_KEYCLOAK_BASE_URL"] %>
 ```
 
-And add these environment variables:
+**Note:** The module will prioritize environment variables (`DECIDIM_KEYCLOAK_*`) over secrets.yml configuration for backwards compatibility.
 
-```
-KEYCLOAK_CLIENT_ID=xxxx
-KEYCLOAK_CLIENT_SECRET=xxxx
-KEYCLOAK_SITE=xxxx
-KEYCLOAK_REALM=xxxx
-```
+### Organization-specific Configuration
 
-You can use different values by organization. You only need to configure it in `/system/organizations/:id/edit`
+You can use different values by organization. Configure it in `/system/organizations/:id/edit`:
 
 ![Login with Keycloak](examples/system_conf.gif)
 

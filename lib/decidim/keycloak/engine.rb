@@ -9,17 +9,32 @@ module Decidim
       isolate_namespace Decidim::Keycloak
 
       initializer "decidim.keycloak.middleware" do |app|
-        omniauth_config = Rails.application.secrets[:omniauth]
-        next if omniauth_config[:keycloakopenid].blank?
+        # Check for environment variables (new method) or secrets.yml (backwards compatibility)
+        has_env_config = ENV["DECIDIM_KEYCLOAK_CLIENT_ID"].present?
+        has_secrets_config = Rails.application.secrets.dig(:omniauth, :keycloakopenid).present?
+        
+        next unless has_env_config || has_secrets_config
 
         app.config.middleware.use OmniAuth::Builder do
           provider :keycloak_openid, setup: lambda { |env|
             request = Rack::Request.new(env)
             organization = Decidim::Organization.find_by(host: request.host)
             config = organization.enabled_omniauth_providers[:keycloakopenid]
-            env["omniauth.strategy"].options[:client_id] = config[:client_id]
-            env["omniauth.strategy"].options[:client_secret] = config[:client_secret]       
-            env["omniauth.strategy"].options[:client_options] = { site: config[:site], realm: config[:realm], base_url: config[:base_url], redirect_uri: request.url.split("?").first + "/callback" } # remove the language parameter from the callback url
+            
+            # Use environment variables first (preferred), fall back to config/secrets
+            env["omniauth.strategy"].options[:client_id] = ENV.fetch("DECIDIM_KEYCLOAK_CLIENT_ID", config[:client_id])
+            env["omniauth.strategy"].options[:client_secret] = ENV.fetch("DECIDIM_KEYCLOAK_CLIENT_SECRET", config[:client_secret])
+            
+            site = ENV.fetch("DECIDIM_KEYCLOAK_SITE", config[:site])
+            realm = ENV.fetch("DECIDIM_KEYCLOAK_REALM", config[:realm])
+            base_url = ENV.fetch("DECIDIM_KEYCLOAK_BASE_URL", config[:base_url])
+            
+            env["omniauth.strategy"].options[:client_options] = { 
+              site: site, 
+              realm: realm, 
+              base_url: base_url, 
+              redirect_uri: request.url.split("?").first + "/callback" # remove the language parameter from the callback url
+            }
           }
         end
       end
