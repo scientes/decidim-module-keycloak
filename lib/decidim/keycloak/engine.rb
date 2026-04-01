@@ -8,37 +8,42 @@ module Decidim
     class Engine < ::Rails::Engine
       isolate_namespace Decidim::Keycloak
 
-      initializer "decidim.keycloak.middleware" do |app|
-        # Check for environment variables (new method) or secrets.yml (backwards compatibility)
-        has_env_config = ENV["DECIDIM_KEYCLOAK_CLIENT_ID"].present?
-        has_secrets_config = begin
-          Rails.application.secrets.dig(:omniauth, :keycloakopenid).present?
-        rescue NoMethodError
-          false
-        end
-        
-        next unless has_env_config || has_secrets_config
+      # Register the Keycloak provider with Decidim so it appears in
+      # organization settings and is known to the Decidim admin UI.
+      initializer "decidim_keycloak.register_provider" do
+        Decidim.omniauth_providers[:keycloakopenid] = {
+          enabled: ENV.fetch("OMNIAUTH_KEYCLOAK_ENABLED", "true") == "true",
+          icon_path: "media/images/keycloak_logo.svg"
+        }
+      end
+
+      # Add the OmniAuth middleware for Keycloak.
+      # Reads per-organization config at request time, falling back to ENV.
+      initializer "decidim_keycloak.middleware" do |app|
+        next unless Decidim.omniauth_providers[:keycloakopenid]
 
         app.config.middleware.use OmniAuth::Builder do
           provider :keycloak_openid, setup: lambda { |env|
             request = Rack::Request.new(env)
             organization = Decidim::Organization.find_by(host: request.host)
-            config = organization.enabled_omniauth_providers[:keycloakopenid]
-            
-            # Use environment variables first (preferred), fall back to config/secrets
-            env["omniauth.strategy"].options[:client_id] = ENV.fetch("DECIDIM_KEYCLOAK_CLIENT_ID", config[:client_id])
-            env["omniauth.strategy"].options[:client_secret] = ENV.fetch("DECIDIM_KEYCLOAK_CLIENT_SECRET", config[:client_secret])
-            
-            site = ENV.fetch("DECIDIM_KEYCLOAK_SITE", config[:site])
-            realm = ENV.fetch("DECIDIM_KEYCLOAK_REALM", config[:realm])
-            base_url = ENV.fetch("DECIDIM_KEYCLOAK_BASE_URL", config[:base_url])
-            
-            env["omniauth.strategy"].options[:client_options] = { 
-              site: site, 
-              realm: realm, 
-              base_url: base_url, 
+            provider_config = organization&.enabled_omniauth_providers&.dig(:keycloakopenid) || {}
+
+            env["omniauth.strategy"].options[:client_id] =
+              provider_config[:client_id].presence || ENV["OMNIAUTH_KEYCLOAK_CLIENT_ID"]
+
+            env["omniauth.strategy"].options[:client_secret] =
+              provider_config[:client_secret].presence || ENV["OMNIAUTH_KEYCLOAK_CLIENT_SECRET"]
+
+            site = provider_config[:site].presence || ENV["OMNIAUTH_KEYCLOAK_SITE"]
+            realm = provider_config[:realm].presence || ENV["OMNIAUTH_KEYCLOAK_REALM"]
+            base_url = provider_config[:base_url].presence || ENV["OMNIAUTH_KEYCLOAK_BASE_URL"]
+
+            env["omniauth.strategy"].options[:client_options] = {
+              site: site,
+              realm: realm,
+              base_url: base_url,
               redirect_uri: request.url.split("?").first + "/callback" # remove the language parameter from the callback url
-            }
+            }.compact
           }
         end
       end

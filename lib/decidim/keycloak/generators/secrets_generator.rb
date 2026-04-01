@@ -5,8 +5,12 @@ require "rails/generators/base"
 module Decidim
   module Keycloak
     module Generators
+      # @deprecated This generator is for Decidim <= 0.30 which used config/secrets.yml.
+      #   In Decidim >= 0.31, secrets.yml was removed. The engine now reads ENV
+      #   variables directly (OMNIAUTH_KEYCLOAK_*) and registers the provider
+      #   via Decidim.omniauth_providers automatically.
       class SecretsGenerator < Rails::Generators::Base
-        desc "This generator modifies secrets file adding keycloakid to omniauth methods"
+        desc "This generator modifies secrets file adding keycloakid to omniauth methods (DEPRECATED for Decidim >= 0.31)"
         def modify_secrets_file
           case Rails.env
           when "development"

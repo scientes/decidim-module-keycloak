@@ -10,7 +10,8 @@ require "decidim/dev/test/base_spec_helper"
 
 RSpec.configure do |config|
   config.before do
-    Rails.application.secrets[:omniauth][:keycloakopenid] = { enabled: true }
+    # Ensure the Keycloak provider is registered and enabled for tests
+    Decidim.omniauth_providers[:keycloakopenid] = { enabled: true, icon_path: "media/images/keycloak_logo.svg" }
     Rails.application.reload_routes!
   end
 end
