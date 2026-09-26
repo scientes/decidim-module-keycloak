@@ -7,6 +7,10 @@ desc "Generates a dummy app for testing"
 task test_app: "decidim:generate_external_test_app" do
   ENV["RAILS_ENV"] = "test"
   Decidim::Keycloak::Generators::SecretsGenerator.start
+  Dir.chdir("spec/decidim_dummy_app") do
+    system("bundle exec rake decidim_keycloak:install:migrations", exception: true)
+    system("bundle exec rake db:migrate", exception: true)
+  end
 end
 
 desc "Generates a development app."
