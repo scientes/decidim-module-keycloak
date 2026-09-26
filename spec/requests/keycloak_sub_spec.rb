@@ -102,6 +102,45 @@ describe "Storing the Keycloak sub on the identity", type: :request do
     end
   end
 
+  context "when the session's verified sub was set for a different organization" do
+    let(:other_organization) { create(:organization) }
+    let!(:other_identity) do
+      create(:identity, user: create(:user, :confirmed, organization: other_organization),
+                        provider: "keycloakopenid", uid: nickname, keycloak_sub: nil)
+    end
+
+    # No identity for `nickname` exists yet in `organization`, so the first
+    # callback goes through the (irrelevant here) new-user/ToS path; stub its
+    # rendering exactly like the "new user" context below, so the request
+    # completes and the after_action still runs without depending on views.
+    before do
+      allow_any_instance_of(Decidim::Devise::OmniauthRegistrationsController) # rubocop:disable RSpec/AnyInstance
+        .to receive(:render).and_wrap_original do |original, *args, **kwargs|
+          args.first == :new_tos_fields ? original.receiver.head(:ok) : original.call(*args, **kwargs)
+        end
+    end
+
+    it "is not applied to a same-uid identity of another organization" do
+      # No identity with this uid exists yet in `organization`, so the store
+      # step no-ops and leaves the verified sub sitting in the (signed) session.
+      callback!
+      expect(Decidim::Identity.exists?(organization: organization, uid: nickname)).to be(false)
+
+      # A session cookie is scoped to the whole app, not to one organization,
+      # so it can be replayed against another one. Any action on the omniauth
+      # registrations controller runs the after_action that would consume it;
+      # use an unrelated, harmless registration to reach it without raising.
+      host! other_organization.host
+      post "/omniauth_registrations.user", params: {
+        user: { provider: "keycloakopenid", uid: "harmless", email: "harmless@example.org",
+                name: "Harmless Person", nickname: "harmless", tos_agreement: "1",
+                oauth_signature: Decidim::OmniauthRegistrationForm.create_signature("keycloakopenid", "harmless") }
+      }
+
+      expect(other_identity.reload.keycloak_sub).to be_nil
+    end
+  end
+
   context "with a new user that has to accept the ToS" do
     # The ToS form itself is irrelevant here; skip template rendering so the
     # spec does not depend on compiled frontend assets.
