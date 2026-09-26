@@ -49,6 +49,11 @@ module Decidim
       end
 
       config.to_prepare do
+        require "decidim/keycloak/store_sub_on_login"
+        unless Decidim::Devise::OmniauthRegistrationsController.include?(Decidim::Keycloak::StoreSubOnLogin)
+          Decidim::Devise::OmniauthRegistrationsController.include(Decidim::Keycloak::StoreSubOnLogin)
+        end
+
         class OmniAuth::Strategies::KeycloakOpenId
           uid { raw_info["preferred_username"] }
 
